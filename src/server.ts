@@ -168,7 +168,7 @@ server.register(async function (fastify) {
 // HTTP route for testing
 server.get('/', async (request, reply) => {
   reply.type('text/html');
-  const htmlContent = fs.readFileSync(path.join(__dirname, '../public/test.html'), 'utf8');
+  const htmlContent = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   return htmlContent;
 });
 
