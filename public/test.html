@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        #messages {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        .connection-status {
+            margin-left: 10px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .connected {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .disconnected {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .message .sender {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .message .content {
+            color: #333;
+        }
+        .system-message {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Test</h2>
+    <div>
+        <input type="text" id="wsUrlInput" value="ws://127.0.0.1:3000/ws/chat" placeholder="ws://127.0.0.1:3000/ws/echo" style="width: 300px;">
+        <button onclick="connectWithInput()">Connect</button>
+        <span id="connectionStatus" class="connection-status disconnected">Disconnected</span>
+        <span id="clientName" style="margin-left: 10px;"></span>
+    </div>
+    <input type="text" id="messageInput" placeholder="Type a message">
+    <button onclick="sendMessage()">Send</button>
+    <div id="messages"></div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const messagesDiv = document.getElementById('messages');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const clientNameSpan = document.getElementById('clientName');
+        let wsUrl = document.getElementById('wsUrlInput') ? document.getElementById('wsUrlInput').value : 'ws://127.0.0.1:3000/ws/echo';
+        let isIntentionalClose = false;
+        let myName = '';
+
+        function updateConnectionStatus(connected) {
+            connectionStatus.textContent = connected ? 'Connected' : 'Disconnected';
+            connectionStatus.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
+        }
+
+        function cleanupWebSocket() {
+            if (ws) {
+                isIntentionalClose = true;
+                ws.onclose = null; // Remove the onclose handler to prevent auto-reconnect
+                ws.close();
+                ws = null;
+                updateConnectionStatus(false);
+                clientNameSpan.textContent = '';
+                myName = '';
+            }
+        }
+
+        function connect() {
+            if (reconnectAttempts >= maxReconnectAttempts) {
+                appendMessage('Maximum reconnection attempts reached. Please refresh the page.', 'error');
+                return;
+            }
+
+            try {
+                appendMessage('Attempting to connect to ' + wsUrl + ' (Attempt ' + (reconnectAttempts + 1) + ')', 'success');
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    appendMessage('Connected to WebSocket server', 'success');
+                    reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+                    updateConnectionStatus(true);
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        switch (data.type) {
+                            case 'identity':
+                                myName = data.name;
+                                clientNameSpan.textContent = `Your name: ${myName}`;
+                                break;
+                            case 'welcome':
+                                appendMessage(data.message, 'system-message');
+                                break;
+                            case 'message':
+                                appendMessage(`${data.sender}: ${data.content}`, 'message');
+                                break;
+                            default:
+                                appendMessage(event.data, 'success');
+                        }
+                    } catch (error) {
+                        // If the message is not JSON, display it as is
+                        appendMessage(event.data, 'success');
+                    }
+                };
+
+                ws.onclose = (event) => {
+                    appendMessage('Disconnected from WebSocket server. Code: ' + event.code + ', Reason: ' + event.reason, 'error');
+                    updateConnectionStatus(false);
+                    
+                    if (!isIntentionalClose) {
+                        reconnectAttempts++;
+                        // Try to reconnect after 3 seconds
+                        setTimeout(connect, 3000);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    appendMessage('WebSocket Error: ' + error.message, 'error');
+                };
+            } catch (error) {
+                appendMessage('Connection Error: ' + error.message, 'error');
+                reconnectAttempts++;
+                // Try to reconnect after 3 seconds
+                setTimeout(connect, 3000);
+            }
+        }
+
+        function connectWithInput() {
+            const input = document.getElementById('wsUrlInput');
+            const newUrl = input.value || 'ws://127.0.0.1:3000/ws/echo';
+            
+            if (newUrl !== wsUrl) {
+                wsUrl = newUrl;
+                reconnectAttempts = 0;
+                cleanupWebSocket();
+                connect();
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value;
+            if (!ws) {
+                appendMessage('WebSocket is not initialized', 'error');
+                return;
+            }
+            if (ws.readyState !== WebSocket.OPEN) {
+                appendMessage('WebSocket is not connected. Current state: ' + ws.readyState, 'error');
+                return;
+            }
+            try {
+                ws.send(message);
+                input.value = '';
+            } catch (error) {
+                appendMessage('Error sending message: ' + error.message, 'error');
+            }
+        }
+
+        function appendMessage(message, type) {
+            const messageElement = document.createElement('div');
+            messageElement.className = type;
+            
+            if (type === 'message') {
+                const [sender, content] = message.split(': ');
+                messageElement.innerHTML = `<span class="sender">${sender}:</span><span class="content">${content}</span>`;
+            } else {
+                messageElement.textContent = message;
+            }
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Allow sending message with Enter key
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Clean up WebSocket connection when the page is unloaded
+        window.addEventListener('beforeunload', cleanupWebSocket);
+
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html> 
