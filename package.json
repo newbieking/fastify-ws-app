@@ -9,7 +9,7 @@
     "watch": "tsc -w"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@fastify/websocket": "^8.3.1",
