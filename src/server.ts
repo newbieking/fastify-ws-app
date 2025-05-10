@@ -122,20 +122,26 @@ server.register(async function (fastify) {
         }
       });
 
-      // Generate and send AI response after a short delay
-      setTimeout(() => {
-        const aiResponse = generateAIResponse(messageStr);
-        fastify.websocketServer.clients.forEach((client) => {
-          const ws = client as unknown as WebSocket;
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'message',
-              sender: 'AI',
-              content: aiResponse
-            }));
-          }
-        });
-      }, 1000); // 1 second delay to simulate AI processing
+      // Only generate AI response if message starts with '@ai'
+      if (messageStr.startsWith('@ai')) {
+        // Remove the 'at-ai' prefix from the message
+        const aiMessage = messageStr.slice(3).trim();
+        
+        // Generate and send AI response after a short delay
+        setTimeout(() => {
+          const aiResponse = generateAIResponse(aiMessage);
+          fastify.websocketServer.clients.forEach((client) => {
+            const ws = client as unknown as WebSocket;
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'message',
+                sender: 'AI',
+                content: aiResponse
+              }));
+            }
+          });
+        }, 1000); // 1 second delay to simulate AI processing
+      }
     });
 
     connection.socket.on('error', (error: Error) => {

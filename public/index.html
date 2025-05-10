@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebSocket Test</title>
+    <title>WebSocket Chat</title>
     <style>
         #messages {
             margin-top: 20px;
@@ -41,19 +41,44 @@
         .message .content {
             color: #333;
         }
+        .message .ai-prefix {
+            color: #007bff;
+            font-weight: bold;
+            background-color: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
         .system-message {
             color: #666;
             font-style: italic;
         }
+        .ai-hint {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            color: #666;
+        }
+        .ai-hint code {
+            background-color: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
-    <h2>WebSocket Test</h2>
+    <h2>WebSocket Chat</h2>
     <div>
-        <input type="text" id="wsUrlInput" value="ws://127.0.0.1:3000/ws/chat" placeholder="ws://127.0.0.1:3000/ws/echo" style="width: 300px;">
+        <input type="text" id="wsUrlInput" placeholder="WebSocket URL" style="width: 300px;">
         <button onclick="connectWithInput()">Connect</button>
         <span id="connectionStatus" class="connection-status disconnected">Disconnected</span>
         <span id="clientName" style="margin-left: 10px;"></span>
+    </div>
+    <div class="ai-hint">
+        To chat with AI, start your message with <code>@ai</code>. For example: <code>@ai Hello, how are you?</code>
     </div>
     <input type="text" id="messageInput" placeholder="Type a message">
     <button onclick="sendMessage()">Send</button>
@@ -66,7 +91,17 @@
         const messagesDiv = document.getElementById('messages');
         const connectionStatus = document.getElementById('connectionStatus');
         const clientNameSpan = document.getElementById('clientName');
-        let wsUrl = document.getElementById('wsUrlInput') ? document.getElementById('wsUrlInput').value : 'ws://127.0.0.1:3000/ws/echo';
+        const wsUrlInput = document.getElementById('wsUrlInput');
+        
+        // Get the current server's address and port
+        const serverAddress = window.location.hostname;
+        const serverPort = window.location.port || '3000';
+        const defaultWsUrl = `ws://${serverAddress}:${serverPort}/ws/chat`;
+        
+        // Set the default WebSocket URL in the input field
+        wsUrlInput.value = defaultWsUrl;
+        
+        let wsUrl = defaultWsUrl;
         let isIntentionalClose = false;
         let myName = '';
 
@@ -150,8 +185,7 @@
         }
 
         function connectWithInput() {
-            const input = document.getElementById('wsUrlInput');
-            const newUrl = input.value || 'ws://127.0.0.1:3000/ws/echo';
+            const newUrl = wsUrlInput.value || defaultWsUrl;
             
             if (newUrl !== wsUrl) {
                 wsUrl = newUrl;
@@ -186,7 +220,16 @@
             
             if (type === 'message') {
                 const [sender, content] = message.split(': ');
-                messageElement.innerHTML = `<span class="sender">${sender}:</span><span class="content">${content}</span>`;
+                let formattedContent = content;
+                
+                // Check if the message starts with @ai and format it
+                if (content.startsWith('@ai')) {
+                    const aiPrefix = content.substring(0, 3);
+                    const restOfMessage = content.substring(3);
+                    formattedContent = `<span class="ai-prefix">${aiPrefix}</span>${restOfMessage}`;
+                }
+                
+                messageElement.innerHTML = `<span class="sender">${sender}:</span><span class="content">${formattedContent}</span>`;
             } else {
                 messageElement.textContent = message;
             }
